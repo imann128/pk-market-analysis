@@ -9,7 +9,7 @@ The KSE-100 gained 4.49% in the week ending 6 November 2026, its best week in si
 - **The rally was ordinary.** +4.49% is the 95.6th percentile. 23 of 520 weeks were as good or better, about one every 23 weeks.
 - **The extremes are not.** Weekly moves beyond ±11% happened 4 times in 10 years. A bell curve with the same mean and standard deviation expects that about once in 280 years.
 - **Fat tails, thin shoulders.** Moves beyond 3 standard deviations (±8.2%) happened 4.3x more often than a bell curve predicts, while moderately large moves (2 to 3 std) happened slightly *less* often.
-- Excess kurtosis is 3.1 (a bell curve is 0). The Jarque-Bera test rejects normality (p ≈ 3e-46).
+- Excess kurtosis is 3.2 (a bell curve is 0). The Jarque-Bera test rejects normality (p ≈ 3e-46).
 
 | Statistic | Value |
 |---|---|
@@ -17,7 +17,7 @@ The KSE-100 gained 4.49% in the week ending 6 November 2026, its best week in si
 | Mean weekly return | +0.31% |
 | Standard deviation | 2.75% |
 | Skew | -0.02 |
-| Excess kurtosis | 3.11 |
+| Excess kurtosis | 3.15 |
 
 ## Method
 

@@ -1,34 +1,10 @@
-"""
-How unusual was a given KSE-100 week? Weekly return distribution vs a bell curve.
-
-Usage:
-    python analysis.py data/kse100.csv                    # latest complete week
-    python analysis.py data/kse100.csv --week 2026-11-06  # a specific week (its Friday)
-
-Input: Investing.com "Historical Data" CSV for Karachi 100 (daily),
-columns Date (MM/DD/YYYY) and Price (comma thousands separators).
-
-Steps
-  1. Load daily closes. Rows dated today are dropped, because during market
-     hours Investing.com shows an intraday price as today's close.
-  2. Weekly return for week w:  r_w = P_w / P_(w-1) - 1
-     P_w = last closing price in the Mon-Fri week (labelled by its Friday).
-     The final week is dropped if it has not finished yet.
-  3. Distribution: mean, standard deviation, skew, excess kurtosis
-     (excess kurtosis is 0 for a bell curve; above 0 means fat tails).
-  4. The chosen week: z-score = (r - mean) / std, percentile, and how often
-     weeks at least that good occur.
-  5. Tails: actual count of |z| > k vs what a bell curve with the same mean
-     and std expects: N * P(|Z| > k).
-  6. Jarque-Bera test of normality.
-"""
+"""KSE-100 weekly return distribution compared with a fitted normal distribution."""
 from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
 from datetime import date
 
-import numpy as np
 import pandas as pd
 from scipy import stats
 
@@ -44,6 +20,7 @@ class Summary:
 
 
 def load_closes(path: str, keep_today: bool = False) -> pd.Series:
+    """Daily closes from an Investing.com CSV, oldest first, excluding today's intraday row."""
     df = pd.read_csv(path, thousands=",", encoding="utf-8-sig")
     df["Date"] = pd.to_datetime(df["Date"], format="%m/%d/%Y")
     if not keep_today:
@@ -55,20 +32,26 @@ def load_closes(path: str, keep_today: bool = False) -> pd.Series:
 
 
 def weekly_returns(close: pd.Series) -> pd.Series:
+    """Simple returns between the last closes of consecutive Mon-Fri weeks, labelled by Friday."""
     weekly_close = close.resample("W-FRI").last().dropna()
-    # Drop the last week if its Friday is after the last data point (unfinished).
     if weekly_close.index[-1] > close.index[-1]:
         weekly_close = weekly_close.iloc[:-1]
     return weekly_close.pct_change().dropna().rename("weekly_return")
 
 
 def summarise(r: pd.Series) -> Summary:
-    return Summary(r, len(r), r.mean(), r.std(ddof=1), float(stats.skew(r)),
-                   float(stats.kurtosis(r)))
+    return Summary(
+        returns=r,
+        n=len(r),
+        mean=r.mean(),
+        std=r.std(ddof=1),
+        skew=float(stats.skew(r, bias=False)),
+        excess_kurtosis=float(stats.kurtosis(r, bias=False)),
+    )
 
 
 def bell_curve_tail_prob(s: Summary, threshold: float) -> float:
-    """P(|weekly return| > threshold) under a normal with the sample mean/std."""
+    """P(|weekly return| > threshold) under a normal with the sample mean and std."""
     return float(stats.norm.sf(threshold, s.mean, s.std) + stats.norm.cdf(-threshold, s.mean, s.std))
 
 
@@ -109,22 +92,22 @@ def report(s: Summary, week: pd.Timestamp, tail_threshold: float) -> None:
     print(f"\nJarque-Bera = {jb.statistic:.0f}, p = {jb.pvalue:.1e}")
 
 
-def parse_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    ap.add_argument("csv")
-    ap.add_argument("--week", help="Friday date of the week to examine (default: latest complete week)")
-    ap.add_argument("--tail", type=float, default=0.11, help="tail threshold, e.g. 0.11 for ±11%%")
-    ap.add_argument("--keep-today", action="store_true", help="keep a row dated today")
-    return ap.parse_args()
-
-
 def resolve_week(r: pd.Series, week: str | None) -> pd.Timestamp:
     if week is None:
         return r.index[-1]
     ts = pd.Timestamp(week)
     if ts not in r.index:
-        raise SystemExit(f"{week} is not a week label; use the week's Friday date")
+        raise SystemExit(f"{week} is not a week label; expected the week's Friday date")
     return ts
+
+
+def parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("csv", help="Investing.com daily historical data CSV")
+    ap.add_argument("--week", help="Friday date of the week (default: latest complete week)")
+    ap.add_argument("--tail", type=float, default=0.11, help="tail threshold as a decimal (default: 0.11)")
+    ap.add_argument("--keep-today", action="store_true", help="keep a row dated today")
+    return ap.parse_args()
 
 
 if __name__ == "__main__":
